@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -16,6 +15,10 @@ func main() {
 	feed, feedSet := os.LookupEnv("FEED")
 	botToken, botTokenSet := os.LookupEnv("BOT_TOKEN")
 	channel, channelSet := os.LookupEnv("CHANNEL")
+	language, languageSet := os.LookupEnv("LANGUAGE")
+	if !languageSet {
+		language = "en"
+	}
 	if lastArticleFileSet && feedSet && botTokenSet && channelSet {
 		telegram := Telegram{botToken: botToken, channel: channel}
 		http.HandleFunc("/hook", func(w http.ResponseWriter, r *http.Request) {
@@ -30,7 +33,7 @@ func main() {
 				return
 			}
 			if lastArticle := lastArticleUrl(lastArticleFile); lastArticle != article.Url {
-				err = telegram.Post(createMessage(article))
+				err = telegram.Post(createMessage(article, language))
 				if err != nil {
 					http.Error(w, err.Error(), http.StatusInternalServerError)
 					return
@@ -40,8 +43,10 @@ func main() {
 					http.Error(w, err.Error(), http.StatusInternalServerError)
 					return
 				}
+				w.WriteHeader(http.StatusCreated)
+				return
 			} else {
-				http.Error(w, errors.New("no new article").Error(), http.StatusInternalServerError)
+				w.WriteHeader(http.StatusOK)
 				return
 			}
 		})
@@ -60,9 +65,13 @@ func updateLastArticleUrl(filename, url string) error {
 	return ioutil.WriteFile(filename, []byte(url), 0644)
 }
 
-func createMessage(article *Article) string {
+func createMessage(article *Article, lang string) string {
 	var message bytes.Buffer
-	message.WriteString("🔔 Something new was published")
+	if lang == "de" {
+		message.WriteString("🔔 Etwas neues wurde veröffentlicht")
+	} else {
+		message.WriteString("🔔 Something new was published")
+	}
 	message.WriteString("\n\n")
 	if article.Title != "" {
 		message.WriteString(article.Title)
